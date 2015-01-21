@@ -3,3 +3,5 @@ CMSSWrel/*
 processes/*
 scripts/old_cmsDriver_scripts
 scripts/cmsDriver_scripts
+scripts/*.pyc
+scripts/*/*.pyc
