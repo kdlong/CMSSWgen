@@ -64,7 +64,7 @@ def doFall13pLHE(params):
         out_file = path_to_edm_files + "/" + lhe_file_name.replace(".lhe", ".root")
         subprocess.call(["cmsRun", "-e", "-j", 
                          xml_file,
-                         params["BASE_DIR"] + "/config_files/" + params["PLHE_CFG"],
+                         "../config_files/" + params["PLHE_CFG"],
                          "inputFiles=file:" + lhe_file, 
                          "outputFile=file:" + out_file])
     subprocess.call(["gsido", "cp", path_to_edm_files, "/hdfs/store/user/" + params["USERNAME"], "-r"])
@@ -109,17 +109,16 @@ def setupCMSSW(version):
         return
     if version == "7_0_6_patch1":
         architechure = " slc6_amd64_gcc481 "
-    cmssw_dir = params["BASE_DIR"] + "/CMSSWrel"
-    if not os.exists(cmssw_dir):
-        os.mkdir(cmssw_dir)
-    subprocess.call(["source " +  params["BASE_DIR"] + "/scripts/helper_scripts/setupCMSSW.sh "
+    if not os.exists("../CMSSWrel"):
+        os.mkdir("../CMSSWrel")
+    subprocess.call(["source helper_scripts/setupCMSSW.sh "
                         + cmssw_dir 
                         + "".join([" ", version, " "])
                         + " slc6_amd64_gcc481 "],
                      shell = True)   
 # Reads variables given in the param card passed as a command line argument
 def readParamsFromCard(card_name):
-    vars = ["JOB_NAME","MLM_MATCHING","USERNAME","BASE_DIR","CMSSW_PATH","LHE_FILE_TO_SPLIT", 
+    vars = ["JOB_NAME","MLM_MATCHING","USERNAME","CMSSW_PATH","LHE_FILE_TO_SPLIT", 
         "NUM_SPLIT_FILES","PATH_TO_LHE_FILES","LHE_FILE","PLHE_CFG","FALL13_MLM_MATCHING_CFG",
         "FALL13_NO_MATCHING_CFG", "SPRING14DR_STEP1_CFG", "SPRING14DR_STEP2_CFG", "SPRING14MINIAOD_CFG"] 
     card_params = {}
@@ -127,6 +126,7 @@ def readParamsFromCard(card_name):
         card_params.update({var : None})
     with open(card_name) as card:
         for line in card:
+            input = []
             if line[0] != "#":
                 input = line.split("=")
             if len(input) == 2:

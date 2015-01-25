@@ -10,12 +10,9 @@ JOB_NAME = wpz_ewk_m600l_rwgt
 # If true, uncomment the matching parameters
 MLM_MATCHING = False
 
-# user $USER if your hdfs username is that same as your login username
+# Your HDFS username. User $USER if your hdfs username is that same 
+# as your login username
 USERNAME = $USER
-
-# absolute path to your CMSSWgen directory
-BASE_DIR = /cms/$USER/CMSSWgen
-CMSSW_PATH = /cms/$USER/CMSSWgen/CMSSWrel
 
 # Splits LHE_TO_SPLIT into NUM_SPLIT_FILES pieces and submits each one separately
 # Specify full or relative path
