@@ -19,25 +19,29 @@ def addBlockToFiles(path_to_files,  max_jets, min_jets, eta_clus):
         addBlockToFile(file, max_jets, min_jets, eta_clus) 
 def addBlockToFile(lhe_file_name, max_jets, min_jets, eta_clus):
     temp_file_name = "temp.lhe"
-    block_params = readParamsFromLHEFile(lhe_file_name)
+    parms = readParamsFromLHEFile(lhe_file_name)
+    block_location = False
+    has_block = False
     with open("temp.lhe","w") as temp_file:           
         for line in fileinput.input(lhe_file_name):
-            if "</MGRunCard>" not in line:
+            if block_location:
+                if "<MGParamCMS>" in line:
+                    print "MadGraph CMS block already included in file. Will be overwritten."
+                    has_block = True
+                    continue
+                if has_block:
+                    if "</MGParamCMS>" in line:
+                        has_block = False
+                    else:
+                        continue
+                else:
+                    temp_file.write(getCMSBlock(params))
+                    block_location = False
+            elif "</MGRunCard>" not in line:
                 temp_file.write(line)
             else:
                 temp_file.write(line)
-                temp_file.write("<MGParamCMS>\n")
-                temp_file.write("# All parameters that are given here can be selected to be set from this\n")
-                temp_file.write("# header by setting the # corresponding CMSSW config parameter to -1\n")
-                temp_file.write("# In case this is done, the entries here must exist of an error message\n")
-                temp_file.write("# is given.\n")
-                temp_file.write("             %s = ickkw" % block_params['ickkw'])
-                temp_file.write("\n             %s = nqmatch    ! Max Jet Flavor " % block_params["maxjetflavor"])
-                temp_file.write("\n             %s = maxjets    ! Largest number (inclusive ktMLM matching multipl.)" % max_jets)
-                temp_file.write("\n             %s = minjets    ! Smallest number of additional light flavour jets" % min_jets)
-                temp_file.write("\n           %s = etaclmax   ! Maximum pseudorapidity for particles to cluster" % eta_clus)
-                temp_file.write("\n            %s = qcut" % block_params["xqcut"])
-                temp_file.write("\n</MGParamCMS>\n")
+                block_location = True
     shutil.move(temp_file_name, lhe_file_name)
 def readParamsFromLHEFile(lhe_file_name):
     params = ["ickkw", "maxjetflavor", "xqcut"]
@@ -52,6 +56,19 @@ def readParamsFromLHEFile(lhe_file_name):
                     header_info[param] = line[0:pos].strip()
                     params.remove(param)
     return header_info
+def getCMSBlock(params):
+    MG_CMS_block = "\n<MGParamCMS>" \
+        + "\n# All parameters that are given here can be selected to be set from this" \
+        + "\n# header by setting the # corresponding CMSSW config parameter to -1" \
+        + "\n# In case this is done, the entries here must exist of an error message" \
+        + "\n# is given." \
+        + "\n             %s = ickkw" % params['ICKKW'] \
+        + "\n             %s = nqmatch    ! Max Jet Flavor " % parms["NQMATCH"] \
+        + "\n             %s = maxjets    ! Largest number (inclusive ktMLM matching multipl.)" % params[MAXJETS] \
+        + "\n             %s = minjets    ! Smallest number of additional light flavour jets" % params[MINJETS] \
+        + "\n           %s = etaclmax   ! Maximum pseudorapidity for particles to cluster" % params[ETACLMAX] \
+        + "\n            %s = qcut" % parms["QCUT"] \
+        + "\n</MGParamCMS>"
     
 if __name__ == "__main__":
     main()             

@@ -12,21 +12,15 @@ if [ "$#" -ne 3 ]; then
     exit
 fi
 
-working_dir=`pwd`
 release_path=$1
 release_num=$2
 arch=$3
+path=$release_path/CMSSW_$release_num
 
 export SCRAM_ARCH=$arch
-if [ -r $release_path/CMSSW_$release_num/src ] ; then 
+if [ -r $path/src ] ; then 
     echo release CMSSW_$release_num already exists
 else
     cd $release_path
     scram p CMSSW CMSSW_$release_num
 fi
-
-cd $release_path/CMSSW_$release_num/src
-eval `scramv1 runtime -sh`
-scram b
-cd $working_dir
-

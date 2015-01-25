@@ -1,0 +1,50 @@
+# Input card for submiting private LHE files through the CMSSW
+# generation chain. Uncomment and edit lines as directed.
+#
+# Kenneth Long
+# Jan 24 2015
+
+# title of directories and files are derived from this
+JOB_NAME = wpz_ewk_m600l_rwgt
+# True for MLM matching, False for no matching
+# If true, uncomment the matching parameters
+MLM_MATCHING = False
+
+# user $USER if your hdfs username is that same as your login username
+USERNAME = $USER
+
+# absolute path to your CMSSWgen directory
+BASE_DIR = /cms/$USER/CMSSWgen
+CMSSW_PATH = /cms/$USER/CMSSWgen/CMSSWrel
+
+# Splits LHE_TO_SPLIT into NUM_SPLIT_FILES pieces and submits each one separately
+# Specify full or relative path
+LHE_FILE_TO_SPLIT = /cms/$USER/CMSSWgen/processes/wpz_zg_ewk/m4l600_low/wpz_ewk_m600l_rwgt.lhe
+NUM_SPLIT_FILES = 200
+# submits each LHE file in the given path
+#PATH_TO_LHE_FILES = /cms/$USER/CMSSWgen/processes/wpz_zg_ewk/m4l600_low/lhe_files
+# run over a single LHE file
+#LHE_FILE = None
+
+# Name of config file used by each simulation step. Dont change these unless
+# you have a good reason to.
+PLHE_CFG = Fall13pLHE.py
+FALL13_NO_MATCHING_CFG = Fall13_nm.py
+FALL13_MLM_MATCHING_CFG = Fall13_mlm.py
+SPRING14DR_STEP1_CFG = Spring14dr_1.py
+SPRING14DR_STEP2_CFG = Spring14dr_2.py
+SPRING14MINIAOD_CFG = Spring14miniaod.py
+
+# Matching parameters. Only used when MLM matching is True
+# 1 For MLM Matching
+#ICKKW = 1
+# Highest jet flavor consider as massless quark (5 for b quard)
+#NQMATCH = 5
+# Highest multiplicity of jets in Matrix element
+#MAXJETS = 2
+# Highest multiplicity of jets in Matrix element
+#MINJETS = 2
+# Max eta for jet clustering
+#ETACLMAX = 5.0
+# qcut value in pythia
+#QCUT = 15

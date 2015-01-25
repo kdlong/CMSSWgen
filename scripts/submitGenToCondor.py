@@ -9,178 +9,128 @@ import argparse
 import glob
 
 def main():
-    base_dir = "/cms/kdlong/CMSSWgen"
     args = parseComLineArgs()
+    if not os.path.isfile(args.param_card):
+        args.param_card = "../cards/" + args.param_card
+    params = readParamsFromCard(args.param_card)
+    if "pLHE" in args.step:
+        doFall13pLHE(params)
+        if args.step == "pLHEtoFall13":
+            submitStepToCondor("Fall13", params, "")
+    else:
+        opts = "--resubmit-failed-jobs" if args.resubmit else ""
+        submitStepToCondor(args.step, params, opts)
+def doFall13pLHE(params):
     lhe_file_list = []
-    if "pLHE" in args.subparser_name:
-        if args.file_to_split is not None:
-            if args.addCMSBlock:
-                addCMSBlock.addBlockToFile(args.file_to_split, 2, 2, 5.0)
-            if not os.path.exists("lhe_files"):
-                os.mkdir("lhe_files")
-            splitLHEFile.split(args.file_to_split, 
-                "lhe_files/" + args.file_to_split.replace(".lhe", "_"), 
-                args.num_split_files)
-            lhe_file_list = glob.glob("lhe_files/*.lhe")
-        elif args.path_to_lhe_files is not None:
-            lhe_file_list = glob.glob(args.path_to_lhe_files + "/*.lhe")    
-        else:
-            lhe_file_list = [args.lhe_file]
-        doFall13pLHE(lhe_file_list, base_dir, args.job_name, args.hdfs_username)
-    if args.subparser_name == "pLHEtoFall13" or args.subparser_name == "Fall13":
-        doFall13(base_dir, args.match_scheme, args.job_name)     
-    if args.subparser_name == "Spring14dr_1":
-        doSpring14dr_step1(base_dir, args.job_name)
-    if args.subparser_name == "Spring14dr_2":
-        doSpring14dr_step2(base_dir, args.job_name)
-def doFall13pLHE(lhe_file_list, base_dir, job_name, hdfs_username):
-    if not os.path.exists(job_name):
-        os.mkdir(job_name)
+    if params["LHE_FILE_TO_SPLIT"] is not None:
+        if params["MLM_MATCHING"] in ["True", "true"]:
+            addCMSBlock.addBlockToFile(params)
+        split = params["LHE_FILE_TO_SPLIT"].rsplit("/", 1)
+        path = split[0]
+        file_name = split[1]
+        if not os.path.exists(path + "/lhe_files"):
+              os.mkdir(path + "/lhe_files")
+        splitLHEFile.split(params["LHE_FILE_TO_SPLIT"], 
+              path + "/lhe_files/" + file_name.replace(".lhe", "_"), 
+               int(params["NUM_SPLIT_FILES"]))
+        lhe_file_list = glob.glob(path + "/lhe_files/*.lhe")
+    elif params["PATH_TO_LHE_FILES"] is not None:
+        lhe_file_list = glob.glob(params["PATH_TO_LHE_FILES"] + "/*.lhe")    
+    else:
+        lhe_file_list = [params["LHE_FILE"]]
+    if not os.path.exists(params["JOB_NAME"]):
+        os.mkdir(params["JOB_NAME"])
     if not os.path.exists("xml_files"):
         os.mkdir("xml_files")
-    subprocess.call(["source " +  base_dir + "/scripts/helper_scripts/setupCMSSW.sh "
-                        + base_dir + "/CMSSWrel" 
-                        + " 7_0_6_patch1 "
-                        + " slc6_amd64_gcc481 "],
-                     shell = True)
+    setupCMSSW("7_0_6_patch1")
     for lhe_file in lhe_file_list:
         lhe_file_name = lhe_file.split("/")[-1]
         xml_file = "xml_files/" + lhe_file_name.replace(".lhe", ".xml")
-        out_file = job_name + "/" + lhe_file_name.replace(".lhe", ".root")
+        out_file = params["JOB_NAME"] + "/" + lhe_file_name.replace(".lhe", ".root")
         subprocess.call(["cmsRun", "-e", "-j", 
                          xml_file,
-                         base_dir + "/config_files/B2G-Fall13pLHE.py",
+                         params["BASE_DIR"] + "/config_files/" + params["PLHE_CFG"],
                          "inputFiles=file:" + lhe_file, 
                          "outputFile=file:" + out_file])
-    if hdfs_username is not None:
-        subprocess.call(["gsido", "cp", 
-                         job_name, 
-                         "/hdfs/store/user/" + hdfs_username, "-r"])
-def doFall13(base_dir, match_scheme, job_name):
-    if match_scheme == 1:
-        config_file = base_dir + "/config_files/B2G-Fall13_MgM_match_cfg.py"
+    subprocess.call(["gsido", "cp", params["JOB_NAME"], "/hdfs/store/user/" + param["USERNAME"], "-r"])
+def submitStepToCondor(step, params, opts):
+    previous_step = getPreviousStep(step, params)
+    config_name = step.upper() + "_CFG"
+    if "Spring14dr_1" in step:
+        config_name = config_name.replace("_1", "_STEP1")
+    elif "Spring14dr_2" in step:
+        config_name = config_name.replace("_2", "_STEP2")
+    elif step == "Fall13":
+        if params["MLM_MATCHING"] in ["True", "true"]:
+            config_name = config_name.replace("FALL13", "FALL13_MLM_MATCHING")
+        else:
+            config_name = config_name.replace("FALL13", "FALL13_NO_MATCHING")
+    config_file = params[config_name] 
+    if previous_step != "":
+        subprocess.call(["gsido", "".join([params["BASE_DIR"],"/scripts/helper_scripts/rename_sim_files.sh"]),
+            params["JOB_NAME"], params["USERNAME"], step, previous_step])
+    setupCMSSW("7_0_6_patch1")
+    subprocess.call(["farmoutAnalysisJobs " 
+                        + "--input-dir=root://cmsxrootd.hep.wisc.edu//store/user/"
+                        + "".join([params["USERNAME"], "/", params["JOB_NAME"], "-", previous_step,])
+                        + "".join([" ", params["JOB_NAME"], " ", opts, " "])
+                        + " $CMSSW_BASE "
+                        + "".join([params["BASE_DIR"], "/config_files/", config_file])
+                        + " 'inputFiles=$inputFileNames' " 
+                        + " 'outputFile=$outputFileName' "], 
+                    shell=True)                        
+def setupCMSSW(version):
+    if version in os.environ["CMSSW_BASE"]:
+        return
+    if version == "7_0_6_patch1":
+        architechure = " slc6_amd64_gcc481 "
+    cmssw_dir = params["BASE_DIR"] + "/CMSSWrel"
+    if not os.exists(cmssw_dir):
+        os.mkdir(cmssw_dir)
+    subprocess.call(["source " +  params["BASE_DIR"] + "/scripts/helper_scripts/setupCMSSW.sh "
+                        + cmssw_dir 
+                        + "".join([" ", version, " "])
+                        + " slc6_amd64_gcc481 "],
+                     shell = True)    
+def readParamsFromCard(card_name):
+    vars = ["JOB_NAME","MLM_MATCHING","USERNAME","BASE_DIR","CMSSW_PATH","LHE_FILE_TO_SPLIT", 
+        "NUM_SPLIT_FILES","PATH_TO_LHE_FILES","LHE_FILE","PLHE_CFG","FALL13_MLM_MATCHING_CFG",
+        "FALL13_NO_MATCHING_CFG", "SPRING14DR_STEP1_CFG", "SPRING14DR_STEP2_CFG", "SPRING14MINIAOD_CFG"] 
+    card_params = {}
+    for var in vars:
+        card_params.update({var : None})
+    with open(card_name) as card:
+        for line in card:
+            if line[0] != "#":
+                input = line.split("=")
+            if len(input) == 2:
+                if "$USER" in input[1]:
+                    input[1] = input[1].replace("$USER", os.environ["USER"])
+                card_params[input[0].strip()] = input[1].strip()
+    return card_params
+def getPreviousStep(step, params):
+    match = False
+    if params["MLM_MATCHING"] in ["True", "true"]:
+        match = True
+    previous = {}
+    previous.update({"Fall13" : "" })
+    if match:
+        previous.update({"Spring14dr_1" : params["FALL13_MLM_MATCHING_CFG"].strip(".py")}) 
     else:
-        config_file = base_dir + "/config_files/B2G-Fall13_no_match_cfg.py" 
-    subprocess.call(["source " +  base_dir + "/scripts/helper_scripts/setupCMSSW.sh "
-                        + base_dir + "/CMSSWrel" 
-                        + " 7_0_6_patch1 "
-                        + " slc6_amd64_gcc481 "],
-                     shell = True)
-    subprocess.call(["farmoutAnalysisJobs " 
-                        + "--input-dir=root://cmsxrootd.hep.wisc.edu//store/user/kdlong/"
-                        + job_name + "-B2G-Fall13_no_match_cfg "
-                        + job_name 
-                        + " $CMSSW_BASE "
-                        + config_file
-                        + " 'inputFiles=$inputFileNames' " 
-                        + " 'outputFile=$outputFileName'"], 
-                    shell=True)                        
-def doSpring14dr_step1(base_dir, job_name):
-    config_file = base_dir + "/config_files/EXO-Spring14dr_1_cfg.py"
-    subprocess.call(["source " +  base_dir + "/scripts/helper_scripts/setupCMSSW.sh "
-                        + base_dir + "/CMSSWrel" 
-                        + " 7_0_6_patch1 "
-                        + " slc6_amd64_gcc481 "],
-                     shell = True)
-    subprocess.call(["farmoutAnalysisJobs " 
-                        + "--input-dir=root://cmsxrootd.hep.wisc.edu//store/user/kdlong/"
-                        + job_name + "-B2G-Fall13_no_match_cfg "
-                        + job_name 
-                        + " $CMSSW_BASE "
-                        + config_file
-                        + " 'inputFiles=$inputFileNames' " 
-                        + " 'outputFile=$outputFileName'"], 
-                    shell=True)                        
-def doSpring14dr_step2(base_dir, job_name):
-    config_file = base_dir + "/config_files/EXO-Spring14dr_2_cfg.py"
-    subprocess.call(["source " +  base_dir + "/scripts/helper_scripts/setupCMSSW.sh "
-                        + base_dir + "/CMSSWrel" 
-                        + " 7_0_6_patch1 "
-                        + " slc6_amd64_gcc481 "],
-                     shell = True)
-    subprocess.call(["farmoutAnalysisJobs " 
-                        + "--input-dir=root://cmsxrootd.hep.wisc.edu//store/user/kdlong/"
-                        + job_name + "-EXO-Spring14dr_1_cfg "
-                        + job_name 
-                        + " $CMSSW_BASE "
-                        + config_file
-                        + " 'inputFiles=$inputFileNames' " 
-                        + " 'outputFile=$outputFileName'"], 
-                    shell=True)                        
+        previous.update({"Spring14dr_1" : params["FALL13_NO_MATCHING_CFG"].strip(".py") })
+    previous.update({"Spring14dr_2" : params["SPRING14DR_STEP1_CFG"].strip(".py") })
+    previous.update({"Spring14miniaod" : params["SPRING14DR_STEP2_CFG"].strip(".py") })
+    return previous['Spring14dr_1']
 def parseComLineArgs():
     parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers(dest="subparser_name")
-    
-    pLHE = subparsers.add_parser("pLHE")
-    lhe_input = pLHE.add_mutually_exclusive_group(required=True)
-    lhe_input.add_argument("--lhe_file", type=str, help="""lhe file to convert to
-                           to EDM. Will not be split""")
-    lhe_input.add_argument("--path_to_lhe_files", type=str, help="""path to many
-                           lhe files to convert to pLHE""")
-    lhe_input.add_argument("--file_to_split", type=str, help="""lhe_file to be split
-                           before running EDM conversion on each split file""")
-    pLHE.add_argument("--num_split_files", type=int, required=False,
-                      help="number of split files to make from <file_to_split>")
-    pLHE.add_argument("-n", "--job_name", type=str, required=True,
-                      help="Number of files to make from <file_to_split>") 
-    pLHE.add_argument("--hdfs_username", type=str, help="""EDM files will be placed 
-                      in /hdfs/store/<hdfs_username>/<job_name> if provided""") 
-    pLHE.add_argument("--addCMSBlock", action='store_true') 
-    
-    pLHEtoFall13 = subparsers.add_parser("pLHEtoFall13")
-    lhe_input = pLHEtoFall13.add_mutually_exclusive_group(required=True)
-    lhe_input.add_argument("--lhe_file", type=str, help="""lhe file to convert to
-                           to EDM and Hadronize. Will not be split""")
-    lhe_input.add_argument("--path_to_lhe_files", type=str, help="""path to many
-                           lhe files to convert to pLHE and Hadronize""")
-    lhe_input.add_argument("--file_to_split", type=str, help="""lhe_file to be split
-                           before running EDM conversion and Hadronization on each 
-                           split file""")
-    pLHEtoFall13.add_argument("--num_split_files", type=int, required=False,
-                              help="Number of files to make from <file_to_split>") 
-    pLHEtoFall13.add_argument("--addCMSBlock", action='store_true', help="""add 
-                              required CMS block to LHE file. This should be true 
-                              unless the block has already been added""") 
-    pLHEtoFall13.add_argument("-n", "--job_name", type=str, required=True,
-                              help="Name of folder where files will be stored") 
-    pLHEtoFall13.add_argument("--hdfs_username", type=str, help="""EDM files will be 
-                              placed in /hdfs/store/<hdfs_username>/<job_name> if
-                              provided""")
-    pLHEtoFall13.add_argument("--match_scheme", type=int, choices=[0,1], 
-                              required=True,
-                              help="1 for MLM jet matching, 0 for no matching") 
-    
-    fall13 = subparsers.add_parser("Fall13")
-    fall13.add_argument("-n", "--job_name", type=str, required=True,
-                              help="Name of folder where files will be stored") 
-    fall13.add_argument("--hdfs_username", type=str, help="""EDM files will be 
-                              placed in /hdfs/store/<hdfs_username>/<job_name> if
-                              provided""")
-    fall13.add_argument("--match_scheme", type=int, choices=[0,1], 
-                              required=True,
-                              help="1 for MLM jet matching, 0 for no matching") 
-    spring14dr_1 = subparsers.add_parser("Spring14dr_1")
-    spring14dr_1.add_argument("-n", "--job_name", type=str, required=True,
-                              help="Name of folder where files will be stored") 
-    spring14dr_1.add_argument("--hdfs_username", type=str, help="""EDM files will be 
-                              placed in /hdfs/store/<hdfs_username>/<job_name> if
-                              provided""")
-    spring14dr_2 = subparsers.add_parser("Spring14dr_2")
-    spring14dr_2.add_argument("-n", "--job_name", type=str, required=True,
-                              help="Name of folder where files will be stored") 
-    spring14dr_2.add_argument("--hdfs_username", type=str, help="""EDM files will be 
-                              placed in /hdfs/store/<hdfs_username>/<job_name> if
-                              provided""")
- 
+    parser.add_argument("step", type=str, choices=["pLHE", "pLHEtoFall13", "Fall13",
+                        "Spring14dr_1", "Spring14dr_2", "Spring14miniaod"],
+                        help="Specify step in the simulation chain.")
+    parser.add_argument("-r", "--resubmit", action="store_true",
+                       help="resubmit failed jobs from step")
+    parser.add_argument("-c", "--param_card", type=str, required=True,
+                        help="name of param card") 
     args = parser.parse_args()
-    if args.subparser_name == "pLHE" or args.subparser_name == "pLHEtoFall13":
-        if args.num_split_files is not None:
-            if args.file_to_split is None:
-                print "--num_split_files is only allowed when --file_to_split is specified"
-                exit(0)
-        elif args.file_to_split is not None:
-            print "You must specify a number of split files to make if --file_to_split is specified"
-            exit(0)
     return args
 if __name__ == "__main__":
     main()
