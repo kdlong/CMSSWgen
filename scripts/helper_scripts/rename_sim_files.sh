@@ -26,6 +26,6 @@ else
     exit
 fi
 for f in *.root; do
-    mv $f `echo $f | sed "s/-$previous_step//"`; 
+    mv $f `echo $f | sed "s/$previous_step//"`; 
 done
 

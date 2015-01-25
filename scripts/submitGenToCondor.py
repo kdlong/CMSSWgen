@@ -7,8 +7,11 @@ import addCMSBlock
 import os
 import argparse
 import glob
-
+ 
 def main():
+    current_path = os.getcwd()
+    os.chdir(os.path.dirname(sys.argv[0]))
+    print os.getcwd()
     args = parseComLineArgs()
     if not os.path.isfile(args.param_card):
         args.param_card = "../cards/" + args.param_card
@@ -19,7 +22,13 @@ def main():
             submitStepToCondor("Fall13", params, "")
     else:
         opts = "--resubmit-failed-jobs" if args.resubmit else ""
+        print args.step
         submitStepToCondor(args.step, params, opts)
+    os.chdir(current_path)
+# If LHE_FILE_TO_SPLIT is given, this file is split into NUM_SPLIT_FILES,
+# each of which are submitted to the Fall13pLHE step. If PATH_TO_FILES is
+# specified, each file in the path is submitted. If LHE_FILE is specified,
+# only it is submitted.
 def doFall13pLHE(params):
     lhe_file_list = []
     if params["LHE_FILE_TO_SPLIT"] is not None:
@@ -27,34 +36,47 @@ def doFall13pLHE(params):
             addCMSBlock.addBlockToFile(params)
         split = params["LHE_FILE_TO_SPLIT"].rsplit("/", 1)
         path = split[0]
+        print path
         file_name = split[1]
         if not os.path.exists(path + "/lhe_files"):
-              os.mkdir(path + "/lhe_files")
+            os.mkdir(path + "/lhe_files")
         splitLHEFile.split(params["LHE_FILE_TO_SPLIT"], 
               path + "/lhe_files/" + file_name.replace(".lhe", "_"), 
                int(params["NUM_SPLIT_FILES"]))
         lhe_file_list = glob.glob(path + "/lhe_files/*.lhe")
     elif params["PATH_TO_LHE_FILES"] is not None:
+        path = params["PATH_TO_LHE_FILES"]
         lhe_file_list = glob.glob(params["PATH_TO_LHE_FILES"] + "/*.lhe")    
     else:
+        split = params["LHE_FILE_TO_SPLIT"].rsplit("/", 1)
+        path = split[0]
+        file_name = split[1]
         lhe_file_list = [params["LHE_FILE"]]
-    if not os.path.exists(params["JOB_NAME"]):
-        os.mkdir(params["JOB_NAME"])
-    if not os.path.exists("xml_files"):
-        os.mkdir("xml_files")
+    path_to_edm_files = path + "/" + params["JOB_NAME"]
+    if not os.path.exists(path_to_edm_files):
+        os.mkdir(path_to_edm_files)
+    if not os.path.exists(path + "/xml_files"):
+        os.mkdir(path + "/xml_files")
     setupCMSSW("7_0_6_patch1")
     for lhe_file in lhe_file_list:
         lhe_file_name = lhe_file.split("/")[-1]
-        xml_file = "xml_files/" + lhe_file_name.replace(".lhe", ".xml")
-        out_file = params["JOB_NAME"] + "/" + lhe_file_name.replace(".lhe", ".root")
+        xml_file = path + "/xml_files/" + lhe_file_name.replace(".lhe", ".xml")
+        out_file = path_to_edm_files + "/" + lhe_file_name.replace(".lhe", ".root")
         subprocess.call(["cmsRun", "-e", "-j", 
                          xml_file,
                          params["BASE_DIR"] + "/config_files/" + params["PLHE_CFG"],
                          "inputFiles=file:" + lhe_file, 
                          "outputFile=file:" + out_file])
-    subprocess.call(["gsido", "cp", params["JOB_NAME"], "/hdfs/store/user/" + param["USERNAME"], "-r"])
+    subprocess.call(["gsido", "cp", path_to_edm_files, "/hdfs/store/user/" + params["USERNAME"], "-r"])
+# Submits the step in the generation according to the command line step argument
+# and the information in the parameter card given. Requires grid information
+# to allow access to HDFS. Uses rename_sim_files.sh to rename files after multiple 
+# to prevent excessively long names.
 def submitStepToCondor(step, params, opts):
-    previous_step = getPreviousStep(step, params)
+    print "in submittocondor function"
+    print os.getcwd()
+    
+    append_to_name = getPreviousStep(step, params)
     config_name = step.upper() + "_CFG"
     if "Spring14dr_1" in step:
         config_name = config_name.replace("_1", "_STEP1")
@@ -66,19 +88,22 @@ def submitStepToCondor(step, params, opts):
         else:
             config_name = config_name.replace("FALL13", "FALL13_NO_MATCHING")
     config_file = params[config_name] 
-    if previous_step != "":
-        subprocess.call(["gsido", "".join([params["BASE_DIR"],"/scripts/helper_scripts/rename_sim_files.sh"]),
-            params["JOB_NAME"], params["USERNAME"], step, previous_step])
+    if append_to_name != "":
+        append_to_name = "-" + append_to_name
+        subprocess.call(["gsido", "helper_scripts/rename_sim_files.sh",
+            params["JOB_NAME"], params["USERNAME"], step, append_to_name])
     setupCMSSW("7_0_6_patch1")
     subprocess.call(["farmoutAnalysisJobs " 
                         + "--input-dir=root://cmsxrootd.hep.wisc.edu//store/user/"
-                        + "".join([params["USERNAME"], "/", params["JOB_NAME"], "-", previous_step,])
+                        + "".join([params["USERNAME"], "/", params["JOB_NAME"], append_to_name])
                         + "".join([" ", params["JOB_NAME"], " ", opts, " "])
                         + " $CMSSW_BASE "
-                        + "".join([params["BASE_DIR"], "/config_files/", config_file])
+                        + "../config_files/" + config_file
                         + " 'inputFiles=$inputFileNames' " 
                         + " 'outputFile=$outputFileName' "], 
                     shell=True)                        
+# If the desired CMSSW release exists, cmsenv is called in that directory. If it
+# does not exist it is first created.
 def setupCMSSW(version):
     if version in os.environ["CMSSW_BASE"]:
         return
@@ -91,7 +116,8 @@ def setupCMSSW(version):
                         + cmssw_dir 
                         + "".join([" ", version, " "])
                         + " slc6_amd64_gcc481 "],
-                     shell = True)    
+                     shell = True)   
+# Reads variables given in the param card passed as a command line argument
 def readParamsFromCard(card_name):
     vars = ["JOB_NAME","MLM_MATCHING","USERNAME","BASE_DIR","CMSSW_PATH","LHE_FILE_TO_SPLIT", 
         "NUM_SPLIT_FILES","PATH_TO_LHE_FILES","LHE_FILE","PLHE_CFG","FALL13_MLM_MATCHING_CFG",
@@ -108,6 +134,8 @@ def readParamsFromCard(card_name):
                     input[1] = input[1].replace("$USER", os.environ["USER"])
                 card_params[input[0].strip()] = input[1].strip()
     return card_params
+# Returns the name of the previous step. Necessisary to for located the appropriate input
+# directory in HDFS
 def getPreviousStep(step, params):
     match = False
     if params["MLM_MATCHING"] in ["True", "true"]:
@@ -120,7 +148,8 @@ def getPreviousStep(step, params):
         previous.update({"Spring14dr_1" : params["FALL13_NO_MATCHING_CFG"].strip(".py") })
     previous.update({"Spring14dr_2" : params["SPRING14DR_STEP1_CFG"].strip(".py") })
     previous.update({"Spring14miniaod" : params["SPRING14DR_STEP2_CFG"].strip(".py") })
-    return previous['Spring14dr_1']
+    return previous[step]
+# Gets arguments from the command line
 def parseComLineArgs():
     parser = argparse.ArgumentParser()
     parser.add_argument("step", type=str, choices=["pLHE", "pLHEtoFall13", "Fall13",
