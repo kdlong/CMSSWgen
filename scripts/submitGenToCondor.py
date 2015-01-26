@@ -11,10 +11,10 @@ import glob
 def main():
     current_path = os.getcwd()
     os.chdir(os.path.dirname(sys.argv[0]))
-    print os.getcwd()
     args = parseComLineArgs()
+    print args.param_card
     if not os.path.isfile(args.param_card):
-        args.param_card = "../cards/" + args.param_card
+        args.param_card = "../cards/" + args.param_card.rsplit("/", 1)[1]
     params = readParamsFromCard(args.param_card)
     if "pLHE" in args.step:
         doFall13pLHE(params)
@@ -22,7 +22,6 @@ def main():
             submitStepToCondor("Fall13", params, "")
     else:
         opts = "--resubmit-failed-jobs" if args.resubmit else ""
-        print args.step
         submitStepToCondor(args.step, params, opts)
     os.chdir(current_path)
 # If LHE_FILE_TO_SPLIT is given, this file is split into NUM_SPLIT_FILES,
@@ -73,9 +72,6 @@ def doFall13pLHE(params):
 # to allow access to HDFS. Uses rename_sim_files.sh to rename files after multiple 
 # to prevent excessively long names.
 def submitStepToCondor(step, params, opts):
-    print "in submittocondor function"
-    print os.getcwd()
-    
     append_to_name = getPreviousStep(step, params)
     config_name = step.upper() + "_CFG"
     if "Spring14dr_1" in step:
