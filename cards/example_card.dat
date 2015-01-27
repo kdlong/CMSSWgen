@@ -26,11 +26,11 @@ NUM_SPLIT_FILES = 200
 # Name of config file used by each simulation step. Dont change these unless
 # you have a good reason to.
 PLHE_CFG = Fall13pLHE.py
-FALL13_NO_MATCHING_CFG = Fall13_nm.py
-FALL13_MLM_MATCHING_CFG = Fall13_mlm.py
-SPRING14DR_STEP1_CFG = Spring14dr_1.py
-SPRING14DR_STEP2_CFG = Spring14dr_2.py
-SPRING14MINIAOD_CFG = Spring14miniaod.py
+GENSIM_NO_MATCHING_CFG = Fall13_nm.py
+GENSIM_MLM_MATCHING_CFG = Fall13_mlm.py
+HLT_CFG = Phys14DR_1.py
+RECO_CFG = Phys14DR_2.py
+PAT_CFG = Phys14DR_3.py
 
 # Matching parameters. Only used when MLM matching is True
 # 1 For MLM Matching

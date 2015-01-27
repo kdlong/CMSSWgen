@@ -9,33 +9,33 @@ import argparse
 import glob
  
 def main():
-    current_path = os.getcwd()
-    os.chdir(os.path.dirname(sys.argv[0]))
     args = parseComLineArgs()
-    print args.param_card
+    if os.path.isfile(args.param_card):
+        params = readParamsFromCard(args.param_card)
+    current_path = os.getcwd()
+    os.chdir(sys.path[0])
     if not os.path.isfile(args.param_card):
-        args.param_card = "../cards/" + args.param_card.rsplit("/", 1)[1]
-    params = readParamsFromCard(args.param_card)
+        args.param_card = "../cards/" + args.param_card.rsplit("/", 1)[-1]
+        params = readParamsFromCard(args.param_card)
     if "pLHE" in args.step:
-        doFall13pLHE(params)
-        if args.step == "pLHEtoFall13":
-            submitStepToCondor("Fall13", params, "")
+        doGENSIMpLHE(params)
+        if args.step == "pLHEtoGENSIM":
+            submitStepToCondor("GENSIM", params, "")
     else:
         opts = "--resubmit-failed-jobs" if args.resubmit else ""
         submitStepToCondor(args.step, params, opts)
     os.chdir(current_path)
 # If LHE_FILE_TO_SPLIT is given, this file is split into NUM_SPLIT_FILES,
-# each of which are submitted to the Fall13pLHE step. If PATH_TO_FILES is
+# each of which are submitted to the pLHE step. If PATH_TO_FILES is
 # specified, each file in the path is submitted. If LHE_FILE is specified,
 # only it is submitted.
-def doFall13pLHE(params):
+def doGENSIMpLHE(params):
     lhe_file_list = []
     if params["LHE_FILE_TO_SPLIT"] is not None:
         if params["MLM_MATCHING"] in ["True", "true"]:
             addCMSBlock.addBlockToFile(params)
         split = params["LHE_FILE_TO_SPLIT"].rsplit("/", 1)
         path = split[0]
-        print path
         file_name = split[1]
         if not os.path.exists(path + "/lhe_files"):
             os.mkdir(path + "/lhe_files")
@@ -74,21 +74,17 @@ def doFall13pLHE(params):
 def submitStepToCondor(step, params, opts):
     append_to_name = getPreviousStep(step, params)
     config_name = step.upper() + "_CFG"
-    if "Spring14dr_1" in step:
-        config_name = config_name.replace("_1", "_STEP1")
-    elif "Spring14dr_2" in step:
-        config_name = config_name.replace("_2", "_STEP2")
-    elif step == "Fall13":
+    if step == "GENSIM":
         if params["MLM_MATCHING"] in ["True", "true"]:
-            config_name = config_name.replace("FALL13", "FALL13_MLM_MATCHING")
+            config_name += "_MLM_MATCHING"
         else:
-            config_name = config_name.replace("FALL13", "FALL13_NO_MATCHING")
+            config_name += "_NO_MATCHING"
     config_file = params[config_name] 
     if append_to_name != "":
         append_to_name = "-" + append_to_name
         subprocess.call(["gsido", "helper_scripts/rename_sim_files.sh",
             params["JOB_NAME"], params["USERNAME"], step, append_to_name])
-    setupCMSSW("7_0_6_patch1")
+    setupCMSSW("7_2_0")
     subprocess.call(["farmoutAnalysisJobs " 
                         + "--input-dir=root://cmsxrootd.hep.wisc.edu//store/user/"
                         + "".join([params["USERNAME"], "/", params["JOB_NAME"], append_to_name])
@@ -103,10 +99,11 @@ def submitStepToCondor(step, params, opts):
 def setupCMSSW(version):
     if version in os.environ["CMSSW_BASE"]:
         return
-    if version == "7_0_6_patch1":
+    if "7" in version:
         architechure = " slc6_amd64_gcc481 "
-    if not os.exists("../CMSSWrel"):
-        os.mkdir("../CMSSWrel")
+    cmssw_dir = "../CMSSWrel"
+    if not os.path.exists(cmssw_dir):
+        os.mkdir(cmssw_dir)
     subprocess.call(["source helper_scripts/setupCMSSW.sh "
                         + cmssw_dir 
                         + "".join([" ", version, " "])
@@ -115,8 +112,8 @@ def setupCMSSW(version):
 # Reads variables given in the param card passed as a command line argument
 def readParamsFromCard(card_name):
     vars = ["JOB_NAME","MLM_MATCHING","USERNAME","CMSSW_PATH","LHE_FILE_TO_SPLIT", 
-        "NUM_SPLIT_FILES","PATH_TO_LHE_FILES","LHE_FILE","PLHE_CFG","FALL13_MLM_MATCHING_CFG",
-        "FALL13_NO_MATCHING_CFG", "SPRING14DR_STEP1_CFG", "SPRING14DR_STEP2_CFG", "SPRING14MINIAOD_CFG"] 
+        "NUM_SPLIT_FILES","PATH_TO_LHE_FILES","LHE_FILE","PLHE_CFG","GENSIM_MLM_MATCHING_CFG",
+        "GENSIM_NO_MATCHING_CFG", "HLT_CFG", "RECO_CFG", "PAT_CFG"] 
     card_params = {}
     for var in vars:
         card_params.update({var : None})
@@ -137,19 +134,19 @@ def getPreviousStep(step, params):
     if params["MLM_MATCHING"] in ["True", "true"]:
         match = True
     previous = {}
-    previous.update({"Fall13" : "" })
+    previous.update({"GENSIM" : "" })
     if match:
-        previous.update({"Spring14dr_1" : params["FALL13_MLM_MATCHING_CFG"].strip(".py")}) 
+        previous.update({"HLT" : params["GENSIM_MLM_MATCHING_CFG"].strip(".py")}) 
     else:
-        previous.update({"Spring14dr_1" : params["FALL13_NO_MATCHING_CFG"].strip(".py") })
-    previous.update({"Spring14dr_2" : params["SPRING14DR_STEP1_CFG"].strip(".py") })
-    previous.update({"Spring14miniaod" : params["SPRING14DR_STEP2_CFG"].strip(".py") })
+        previous.update({"HLT" : params["GENSIM_NO_MATCHING_CFG"].strip(".py") })
+    previous.update({"RECO" : params["HLT_CFG"].strip(".py") })
+    previous.update({"PAT" : params["RECO_CFG"].strip(".py") })
     return previous[step]
 # Gets arguments from the command line
 def parseComLineArgs():
     parser = argparse.ArgumentParser()
-    parser.add_argument("step", type=str, choices=["pLHE", "pLHEtoFall13", "Fall13",
-                        "Spring14dr_1", "Spring14dr_2", "Spring14miniaod"],
+    parser.add_argument("step", type=str, choices=["pLHE", "pLHEtoGENSIM", "GENSIM",
+                        "HLT", "RECO", "PAT"],
                         help="Specify step in the simulation chain.")
     parser.add_argument("-r", "--resubmit", action="store_true",
                        help="resubmit failed jobs from step")
