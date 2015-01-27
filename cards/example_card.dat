@@ -5,7 +5,7 @@
 # Jan 24 2015
 
 # title of directories and files are derived from this
-JOB_NAME = wpz_ewk_m600l_rwgt
+JOB_NAME = wpz_all_m600l_rwgt
 # True for MLM matching, False for no matching
 # If true, uncomment the matching parameters
 MLM_MATCHING = False
@@ -16,10 +16,10 @@ USERNAME = $USER
 
 # Splits LHE_TO_SPLIT into NUM_SPLIT_FILES pieces and submits each one separately
 # Specify full or relative path
-LHE_FILE_TO_SPLIT = /cms/$USER/CMSSWgen/processes/wpz_zg_ewk/m4l600_low/wpz_ewk_m600l_rwgt.lhe
+LHE_FILE_TO_SPLIT = /cms/$USER/CMSSWgen/processes/wpz_zg_all/m4l600_low/wpz_all_m600l_rwgt.lhe
 NUM_SPLIT_FILES = 200
 # submits each LHE file in the given path
-#PATH_TO_LHE_FILES = /cms/$USER/CMSSWgen/processes/wpz_zg_ewk/m4l600_low/lhe_files
+#PATH_TO_LHE_FILES = /cms/$USER/CMSSWgen/processes/wpz_zg_all/m4l600_low/lhe_files
 # run over a single LHE file
 #LHE_FILE = None
 

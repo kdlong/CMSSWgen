@@ -83,7 +83,7 @@ def submitStepToCondor(step, params, opts):
     if append_to_name != "":
         append_to_name = "-" + append_to_name
         subprocess.call(["gsido", "helper_scripts/rename_sim_files.sh",
-            params["JOB_NAME"], params["USERNAME"], step, append_to_name])
+            params["JOB_NAME"], params["USERNAME"], config_name, append_to_name])
     setupCMSSW("7_2_0")
     subprocess.call(["farmoutAnalysisJobs " 
                         + "--input-dir=root://cmsxrootd.hep.wisc.edu//store/user/"

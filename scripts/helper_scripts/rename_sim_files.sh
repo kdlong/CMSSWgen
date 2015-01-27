@@ -15,17 +15,17 @@ fi
 job_name=$1
 user_name=$2
 current_step=$3
-previous_step=$4
+append=$4
 
-hdfs_path=/hdfs/store/user/$user_name/$job_name-$current_step
+hdfs_path=/hdfs/store/user/$user_name/$job_name$append
 
 if [ -d "$hdfs_path" ]; then
     cd $hdfs_path
 else
-    echo $hdfs_path does not exits. Job failed
+    echo $hdfs_path does not exit. Job failed
     exit
 fi
 for f in *.root; do
-    mv $f `echo $f | sed "s/$previous_step//"`; 
+    mv $f `echo $f | sed "s/$append//"`; 
 done
 
