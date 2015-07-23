@@ -33,8 +33,6 @@ def doGENSIMpLHE(params):
         split = params["LHE_FILE"].rsplit("/", 1)
         path = split[0]
         file_name = split[1]
-        if params["MLM_MATCHING"] in ["True", "true"]:
-            addCMSBlock.addBlockToFile(params)
     else:
         print "Invalid LHE file"
         exit()
@@ -70,17 +68,13 @@ def doGENSIMpLHE(params):
 def submitStepToCondor(step, params, opts):
     append_to_name = getPreviousStep(step, params)
     config_name = step.upper() + "_CFG"
-    if step == "GENSIM":
-        if params["MLM_MATCHING"] in ["True", "true"]:
-            config_name += "_MLM_MATCHING"
-        else:
-            config_name += "_NO_MATCHING"
     config_file = params[config_name] 
-    if append_to_name != "":
-        append_to_name = "-" + append_to_name
-        subprocess.call(["gsido", "helper_scripts/rename_sim_files.sh",
-            params["JOB_NAME"], params["USERNAME"], config_name, append_to_name])
-    #setupCMSSW("7_1_14")
+    
+    #if append_to_name != "":
+    #    append_to_name = "-" + append_to_name
+    #    subprocess.call(["gsido", "helper_scripts/rename_sim_files.sh",
+    #        params["JOB_NAME"], params["USERNAME"], config_name, append_to_name])
+    setupCMSSW("7_1_14")
     subprocess.call(["farmoutAnalysisJobs " 
                         + "--input-dir=root://cmsxrootd.hep.wisc.edu//store/user/"
                         + "".join([params["USERNAME"], "/", params["JOB_NAME"], append_to_name])
@@ -108,9 +102,9 @@ def setupCMSSW(version):
                      shell = True)   
 # Reads variables given in the param card passed as a command line argument
 def readParamsFromCard(card_name):
-    vars = ["JOB_NAME","MLM_MATCHING","USERNAME","CMSSW_PATH","NUM_EVENTS", 
+    vars = ["JOB_NAME","USERNAME","CMSSW_PATH","NUM_EVENTS", 
         "EVENTS_PER_JOB","LHE_FILE","PLHE_CFG","GENSIM_MLM_MATCHING_CFG",
-        "GENSIM_NO_MATCHING_CFG", "HLT_CFG", "RECO_CFG", "PAT_CFG"] 
+        "GENSIM_CFG", "HLT_CFG", "RECO_CFG", "PAT_CFG"] 
     card_params = {}
     for var in vars:
         card_params.update({var : None})
@@ -127,27 +121,10 @@ def readParamsFromCard(card_name):
 # Returns the name of the previous step. Necessisary for locating the appropriate input
 # directory in HDFS
 def getPreviousStep(step, params):
-    match = False
-    if params["MLM_MATCHING"] in ["True", "true"]:
-        match = True
-    previous = {}
-    previous.update({"GENSIM" : "" })
-    if match:
-        previous.update({"HLT" : params["GENSIM_MLM_MATCHING_CFG"].strip(".py")}) 
-    else:
-        previous.update({"HLT" : params["GENSIM_NO_MATCHING_CFG"].strip(".py") })
+    previous.update({"HLT" : params["GENSIM_CFG"].strip(".py") })
     previous.update({"RECO" : params["HLT_CFG"].strip(".py") })
     previous.update({"PAT" : params["RECO_CFG"].strip(".py") })
     return previous[step]
-# Gets arguments from the command line
-def getLHENumEvents(lhe_file_name):
-    with open(lhe_file_name) as lhe_file:
-        for line in lhe_file:
-            if "#  Number of Events" in line:
-                num_events = line.split(":")[-1].strip()
-                return num_events
-    print "Invalid LHE file format. Could not read number of events."
-    exit()
 # formats a number to have length formatted_length regardless of it's order of
 # magnitude by appending leading zeros. e.g., formatNumWithZeros(17, 5) returns
 # 00017 
