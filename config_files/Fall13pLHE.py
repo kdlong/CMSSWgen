@@ -11,8 +11,16 @@ process = cms.Process('LHE')
 from FWCore.ParameterSet.VarParsing import VarParsing
 options = VarParsing ('analysis')
 
+options.register ('skipEvents',
+                  0,
+                  VarParsing.multiplicity.singleton,
+                  VarParsing.varType.int,
+                  "Number of events to skip before processing")
+
 options.inputFiles = "file:test.lhe"
 options.outputFile = "step1.root"
+options.maxEvents = -1
+options.skipEvents = 0
 options.parseArguments() 
 
 # import of standard configurations
@@ -22,14 +30,15 @@ process.load('SimGeneral.MixingModule.mixNoPU_cfi')
 process.load('Configuration.StandardSequences.FrontierConditions_GlobalTag_cff')
 
 process.maxEvents = cms.untracked.PSet(
-    input = cms.untracked.int32(-1)
+    input = cms.untracked.int32(options.maxEvents)
 )
 
 # Input source
 process.source = cms.Source("LHESource",
-    fileNames = cms.untracked.vstring(options.inputFiles)
-
-)
+    fileNames = cms.untracked.vstring(options.inputFiles),
+    skipEvents= cms.untracked.uint32(options.skipEvents),
+    firstEvent = cms.untracked.uint32(options.skipEvents + 1)  
+    )
 
 process.options = cms.untracked.PSet(
 

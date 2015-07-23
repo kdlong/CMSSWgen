@@ -17,10 +17,15 @@ release_num=$2
 arch=$3
 path=$release_path/CMSSW_$release_num
 
+curdir=`pwd`
+
 export SCRAM_ARCH=$arch
 if [ -r $path/src ] ; then 
     echo release CMSSW_$release_num already exists
+    cd $path/src
+    eval `scramv1 runtime -sh`
 else
     cd $release_path
     scram p CMSSW CMSSW_$release_num
 fi
+cd $curdir

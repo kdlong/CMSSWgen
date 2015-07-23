@@ -5,7 +5,7 @@
 # Jan 24 2015
 
 # title of directories and files are derived from this
-JOB_NAME = wpz_all_m600l_rwgt
+JOB_NAME = GENTEST
 # True for MLM matching, False for no matching
 # If true, uncomment the matching parameters
 MLM_MATCHING = False
@@ -14,14 +14,10 @@ MLM_MATCHING = False
 # as your login username
 USERNAME = $USER
 
-# Splits LHE_TO_SPLIT into NUM_SPLIT_FILES pieces and submits each one separately
 # Specify full or relative path
-LHE_FILE_TO_SPLIT = /cms/$USER/CMSSWgen/processes/wpz_zg_all/m4l600_low/wpz_all_m600l_rwgt.lhe
-NUM_SPLIT_FILES = 200
-# submits each LHE file in the given path
-#PATH_TO_LHE_FILES = /cms/$USER/CMSSWgen/processes/wpz_zg_all/m4l600_low/lhe_files
-# run over a single LHE file
-#LHE_FILE = None
+LHE_FILE = /cms/$USER/CMSSWgen/processes/GENTEST/unweighted_events_000.lhe
+NUM_EVENTS = -1
+EVENTS_PER_JOB = 500
 
 # Name of config file used by each simulation step. Dont change these unless
 # you have a good reason to.
@@ -32,16 +28,3 @@ HLT_CFG = Phys14DR_1.py
 RECO_CFG = Phys14DR_2.py
 PAT_CFG = Phys14DR_3.py
 
-# Matching parameters. Only used when MLM matching is True
-# 1 For MLM Matching
-#ICKKW = 1
-# Highest jet flavor consider as massless quark (5 for b quard)
-#NQMATCH = 5
-# Highest multiplicity of jets in Matrix element
-#MAXJETS = 2
-# Highest multiplicity of jets in Matrix element
-#MINJETS = 2
-# Max eta for jet clustering
-#ETACLMAX = 5.0
-# qcut value in pythia
-#QCUT = 15
