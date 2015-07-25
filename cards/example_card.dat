@@ -5,21 +5,30 @@
 # Jan 24 2015
 
 # title of directories and files are derived from this
-JOB_NAME = GENTEST
+JOB_NAME = CMSSW_gen_test
 
 # Your HDFS username. User $USER if your hdfs username is that same 
 # as your login username
 USERNAME = $USER
 
 # Specify full or relative path
-LHE_FILE = /cms/$USER/CMSSWgen/processes/GENTEST/unweighted_events_000.lhe
-NUM_EVENTS = -1 #Do all events
+LHE_FILE = /cms/$USER/CMSSWgen/processes/GENTEST/unweighted_events.lhe
+NUM_EVENTS = 2000 
 EVENTS_PER_JOB = 500
 
 # Name of config file used by each simulation step. These should be set
 # the proper CMSSW config file to use for each step
 PLHE_CFG = Fall13pLHE.py
+PLHE_CMSSW_VERSION = 7_1_16 
+
 GENSIM_CFG = Fall13_nm.py
+GENSIM_CMSSW_VERSION = 7_1_16 
+
 HLT_CFG = Phys14DR_1.py
+HLT_CMSSW_VERSION = 7_4_6
+
 RECO_CFG = Phys14DR_2.py
+PAT_CMSSW_VERSION = 7_4_6
+
 PAT_CFG = Phys14DR_3.py
+PAT_CMSSW_VERSION = 7_4_6

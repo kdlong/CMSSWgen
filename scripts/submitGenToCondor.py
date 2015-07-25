@@ -1,9 +1,7 @@
 #!/bin/env python
 import sys
-sys.path.append("/cms/kdlong/CMSSWgen/scripts/helper_scripts")
+import shutil
 import subprocess
-import splitLHEFile
-import addCMSBlock
 import os
 import argparse
 import glob
@@ -22,7 +20,7 @@ def main():
         if args.step == "pLHEtoGENSIM":
             submitStepToCondor("GENSIM", params, "")
     else:
-        opts = "--resubmit-failed-jobs" if args.resubmit else ""
+        opts = " --resubmit-failed-jobs " if args.resubmit else " "
         submitStepToCondor(args.step, params, opts)
     os.chdir(current_path)
 # each of which are submitted to the pLHE step. If PATH_TO_FILES is
@@ -41,26 +39,39 @@ def doGENSIMpLHE(params):
         os.mkdir(path_to_edm_files)
     if not os.path.exists(path + "/xml_files"):
         os.mkdir(path + "/xml_files")
-    setupCMSSW("7_1_14")
-     
+    setupCMSSW(params["PLHE_CMSSW_VERSION"])
     lhe_file_name = params["LHE_FILE"].rsplit("/", 1)[-1]
     out_file = path_to_edm_files + "/" + lhe_file_name.replace(".lhe", ".root")
     if params["NUM_EVENTS"] == "-1":
         params["NUM_EVENTS"] = getLHENumEvents(params["LHE_FILE"])
    
-    subprocess.call(["./helper_scripts/check_permissions.sh"])
+    if subprocess.call(["./helper_scripts/check_permissions.sh"]):
+        exit(1)
+    hdfs_dir = ''.join(["/hdfs/store/user/",params["USERNAME"], "/", params["JOB_NAME"]])
+    if os.path.isdir(hdfs_dir):
+        print "The directory %s already exists! " % hdfs_dir
+        print "Remove it and try again or use a new JOB_NAME"
+        exit(1)
     print "Running over %s events with %s events per job" % (params["NUM_EVENTS"], params["EVENTS_PER_JOB"])
 
     for i in xrange(0, int(params["NUM_EVENTS"]), int(params["EVENTS_PER_JOB"])):
-        out_file = out_file.replace(".root", "_%s.root" %i)
-        subprocess.call(["cmsRun", 
-                         "../config_files/%s" % params["PLHE_CFG"],
-                         "inputFiles=file:%s" % params["LHE_FILE"], 
-                         "outputFile=file:%s" % out_file,                        
-                         "maxEvents=%s" % params["EVENTS_PER_JOB"],
-                         "skipEvents=%s" % str(i)])
-        print "Created file %s" % out_file
-    subprocess.call(["gsido", "mv", path_to_edm_files, "/hdfs/store/user/" + params["USERNAME"], "-r"])
+        print i
+        current_file = out_file.replace(".root", "_%s.root" % 
+            formatNumWithZeros(i/int(params["EVENTS_PER_JOB"]), 3))
+        if subprocess.call(["cmsRun" 
+                         + " ../config_files/%s" % params["PLHE_CFG"]
+                         + " inputFiles=file:%s" % params["LHE_FILE"] 
+                         + " outputFile=file:%s" % current_file
+                         + " maxEvents=%s" % params["EVENTS_PER_JOB"]
+                         + " skipEvents=%s" % str(i)],
+                    shell=True):
+            print "Error creating file %s" % current_file
+        else:
+            print "Created file %s" % current_file
+    if not subprocess.call(["gsido", "mv", path_to_edm_files, "/hdfs/store/user/" + params["USERNAME"]]):
+        shutil.rmtree(path_to_edm_files)
+    else:
+        print "Failed to move files to /hdfs/store/user/%s" % params["USERNAME"]
 # Submits the step in the generation according to the command line step argument
 # and the information in the parameter card given. Requires grid proxy
 # to allow access to HDFS. Uses rename_sim_files.sh to rename files after multiple steps 
@@ -70,41 +81,53 @@ def submitStepToCondor(step, params, opts):
     config_name = step.upper() + "_CFG"
     config_file = params[config_name] 
     
-    #if append_to_name != "":
-    #    append_to_name = "-" + append_to_name
-    #    subprocess.call(["gsido", "helper_scripts/rename_sim_files.sh",
-    #        params["JOB_NAME"], params["USERNAME"], config_name, append_to_name])
-    setupCMSSW("7_1_14")
+    if append_to_name != "":
+        append_to_name = "-" + append_to_name
+        subprocess.call(["gsido", "helper_scripts/rename_sim_files.sh",
+            params["JOB_NAME"], params["USERNAME"], config_name, append_to_name])
+    setupCMSSW(params[step.upper() + "_CMSSW_VERSION"])
     subprocess.call(["farmoutAnalysisJobs " 
                         + "--input-dir=root://cmsxrootd.hep.wisc.edu//store/user/"
                         + "".join([params["USERNAME"], "/", params["JOB_NAME"], append_to_name])
-                        + "".join([" ", params["JOB_NAME"], " ", opts, " "])
-                        + " $CMSSW_BASE "
-                        + "../config_files/" + config_file
-                        + " 'inputFiles=$inputFileNames' " 
+                        + "".join([" ", params["JOB_NAME"], opts])
+                        + os.environ["CMSSW_BASE"]
+                        + " ../config_files/" + config_file
+                        + " 'inputFiles=$inputFileNames'" 
                         + " 'outputFile=$outputFileName' "], 
                     shell=True)                        
 # If the desired CMSSW release exists, cmsenv is called in that directory. If it
-# does not exist it is first created.
+# does not exist it is first created 
+# 
+# NOTE: This should properly set CMS environment varialbes within this script,
+# But it is much better to set the appropriate CMS release yourself before
+# running the pLHE step, as external varialbes may not be set properly
 def setupCMSSW(version):
     if "CMSSW_BASE" in os.environ.keys():
         if version in os.environ["CMSSW_BASE"]:
             return
     if "7" in version:
         architechure = " slc6_amd64_gcc481 "
-    cmssw_dir = "../CMSSWrel"
+    cmssw_dir = "CMSSWrel"
     if not os.path.exists(cmssw_dir):
         os.mkdir(cmssw_dir)
-    subprocess.call(["source helper_scripts/setupCMSSW.sh "
+    print "Setting up %s " % version
+    command = ['bash', '-c', "source helper_scripts/setupCMSSW.sh "
                         + cmssw_dir 
                         + "".join([" ", version, " "])
-                        + " slc6_amd64_gcc481 "],
-                     shell = True)   
+                        + " slc6_amd64_gcc481"]
+    proc = subprocess.Popen(command, stdout = subprocess.PIPE)
+    for line in proc.stdout:
+        print line
+        (key, _, value) = line.partition("=")
+        os.environ[key.replace("export ", "")] = value 
+    proc.communicate()    
+
 # Reads variables given in the param card passed as a command line argument
 def readParamsFromCard(card_name):
-    vars = ["JOB_NAME","USERNAME","CMSSW_PATH","NUM_EVENTS", 
-        "EVENTS_PER_JOB","LHE_FILE","PLHE_CFG","GENSIM_MLM_MATCHING_CFG",
-        "GENSIM_CFG", "HLT_CFG", "RECO_CFG", "PAT_CFG"] 
+    steps = ["PLHE", "GENSIM", "HLT", "RECO", "PAT"]
+    vars = ["JOB_NAME","USERNAME","NUM_EVENTS","EVENTS_PER_JOB","LHE_FILE"] 
+    for step in steps:
+        vars.extend([''.join([step, "_CFG"]), ''.join([step, "_CMSSW_VERSION"])])
     card_params = {}
     for var in vars:
         card_params.update({var : None})
@@ -116,15 +139,29 @@ def readParamsFromCard(card_name):
             if len(input) == 2:
                 if "$USER" in input[1]:
                     input[1] = input[1].replace("$USER", os.environ["USER"])
-                card_params[input[0].strip()] = input[1].strip()
+                variable = input[0].strip()
+                if variable not in card_params.keys():
+                    print "Invalid card variable %s" % variable
+                card_params[variable] = input[1].strip()
     return card_params
 # Returns the name of the previous step. Necessisary for locating the appropriate input
 # directory in HDFS
 def getPreviousStep(step, params):
+    previous = {}
+    previous.update({"GENSIM" : "" })
     previous.update({"HLT" : params["GENSIM_CFG"].strip(".py") })
     previous.update({"RECO" : params["HLT_CFG"].strip(".py") })
     previous.update({"PAT" : params["RECO_CFG"].strip(".py") })
     return previous[step]
+# Gets arguments from the command line
+def getLHENumEvents(lhe_file_name):
+    with open(lhe_file_name) as lhe_file:
+        for line in lhe_file:
+            if "#  Number of Events" in line:
+                num_events = line.split(":")[-1].strip()
+                return num_events
+    print "Could not read number of events from LHE file."
+    exit()
 # formats a number to have length formatted_length regardless of it's order of
 # magnitude by appending leading zeros. e.g., formatNumWithZeros(17, 5) returns
 # 00017 

@@ -39,4 +39,5 @@ if [ "$NO_SUBMIT" != 1 ] && ! check_proxy $MIN_PROXY_HOURS $proxy; then
   echo
   echo "voms-proxy-init --voms=cms --valid=48:00"
   echo
+  exit 1
 fi
