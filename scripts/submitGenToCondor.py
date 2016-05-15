@@ -84,12 +84,13 @@ def submitStepToCondor(step, params, opts):
     cmssw_version = params[step.upper() + "_CMSSW_VERSION"]
     files_per_job = params["%s_FILES_PER_JOB" % step.upper()]
     if append_to_name != "":
-        subprocess.call(["gsido", "helper_scripts/rename_sim_files.sh",
-            params["JOB_NAME"], params["USERNAME"], config_name, append_to_name])
+        append_to_name = "-" + append_to_name
+        #subprocess.call(["gsido", "helper_scripts/rename_sim_files.sh",
+        #    params["JOB_NAME"], params["USERNAME"], config_name, append_to_name])
     setupCMSSW(cmssw_version, "../CMSSWrel")
     subprocess.call(["farmoutAnalysisJobs " 
                         + "/".join(["--input-dir=root://cmsxrootd.hep.wisc.edu//store/user",
-                            params["USERNAME"], "-".join([params["JOB_NAME"], append_to_name])])
+                            params["USERNAME"], params["JOB_NAME"] + append_to_name])
                         + ("" if files_per_job is None else \
                             (" --input-files-per-job=%s" % files_per_job))
                         + "".join([" ", params["JOB_NAME"], opts])
@@ -125,7 +126,7 @@ def setupCMSSW(version, cmssw_dir):
 
 # Reads variables given in the param card passed as a command line argument
 def readParamsFromCard(card_name):
-    steps = ["PLHE", "GENSIM", "DIGI", "RECO", "AOD", "MINIAOD"]
+    steps = ["PLHE", "GENSIM", "DIGI", "RECO", "MINIAOD"]
     card_vars = ["JOB_NAME","USERNAME","NUM_EVENTS","EVENTS_PER_JOB","LHE_FILE"] 
     for step in steps:
         card_vars.extend(["%s_%s" % (step, x) for x in 
@@ -154,8 +155,7 @@ def getPreviousStep(step, params):
     config_name = lambda x: x.split("/")[-1].strip(".py")
     previous.update({"DIGI" : config_name(params["GENSIM_CFG"]) })
     previous.update({"RECO" : config_name(params["DIGI_CFG"]) })
-    previous.update({"AOD" : config_name(params["RECO_CFG"]) })
-    previous.update({"MINIAOD" : config_name(params["AOD_CFG"]) })
+    previous.update({"MINIAOD" : config_name(params["RECO_CFG"]) })
     return previous[step]
 # Gets arguments from the command line
 def getLHENumEvents(lhe_file_name):
